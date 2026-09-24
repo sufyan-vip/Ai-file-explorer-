@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Description
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Code
@@ -43,7 +43,7 @@ fun fileIcon(name: String, isDirectory: Boolean): ImageVector = when (FileType.c
     FileType.Category.ARCHIVE -> Icons.Default.Archive
     FileType.Category.APK -> Icons.Default.Smartphone
     FileType.Category.CODE -> Icons.Default.Code
-    FileType.Category.DOCUMENT, FileType.Category.TEXT -> Icons.AutoMirrored.Filled.Description
+    FileType.Category.DOCUMENT, FileType.Category.TEXT -> Icons.Default.Description
     else -> Icons.Default.InsertDriveFile
 }
 

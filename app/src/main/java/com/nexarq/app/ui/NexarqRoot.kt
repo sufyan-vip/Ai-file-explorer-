@@ -64,7 +64,9 @@ fun NexarqRoot(container: AppContainer) {
     val settings by container.settings.settings.collectAsState(initial = SettingsRepository.AppSettings())
     NexarqTheme(themeOverride = settings.theme, dynamicColors = settings.dynamicColors) {
         CompositionLocalProvider(LocalContainer provides container) {
-            AppScaffold(container = container)
+            StorageAccessGate {
+                AppScaffold(container = container)
+            }
         }
     }
 }

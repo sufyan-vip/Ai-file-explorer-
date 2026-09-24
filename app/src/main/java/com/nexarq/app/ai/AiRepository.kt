@@ -139,7 +139,7 @@ class AiRepository(
         val configured = configFor(provider).model
         if (configured.isNotBlank()) return configured
         return when (provider) {
-            AiProvider.GEMINI -> "gemini-1.5-flash"
+            AiProvider.GEMINI -> "gemini-2.5-flash"
             AiProvider.OPENROUTER -> "openai/gpt-4o-mini"
         }
     }
@@ -176,7 +176,7 @@ class AiRepository(
     ) {
         val providers = enabledProviders()
         if (providers.isEmpty()) {
-            onError(AiError.NoProvider)
+            onError(AiError.NoProvider())
             return
         }
         val fallback = _settings.value.fallbackEnabled && providers.size > 1
@@ -193,7 +193,7 @@ class AiRepository(
                 if (!fallback) break
             }
         }
-        onError(lastError ?: AiError.NoProvider)
+        onError(lastError ?: AiError.NoProvider())
     }
 
     /** Non-streaming convenience for one-shot tasks (analyze, summarize, explain). */
@@ -202,7 +202,7 @@ class AiRepository(
         systemPrompt: String? = null,
     ): Result<AiResult> = withContext(Dispatchers.IO) {
         val providers = enabledProviders()
-        if (providers.isEmpty()) return@withContext Result.failure(AiError.NoProvider)
+        if (providers.isEmpty()) return@withContext Result.failure(AiError.NoProvider())
         val fallback = _settings.value.fallbackEnabled && providers.size > 1
         var lastError: Exception? = null
         for (provider in providers) {
@@ -214,7 +214,7 @@ class AiRepository(
                 if (!fallback) break
             }
         }
-        Result.failure(lastError ?: AiError.NoProvider)
+        Result.failure(lastError ?: AiError.NoProvider())
     }
 
     private suspend fun streamFrom(
@@ -259,8 +259,8 @@ class AiRepository(
         val body = buildJsonObject {
             if (systemPrompt != null) {
                 putJsonObject("systemInstruction") {
-                    putJsonObject("parts") {
-                        put("text", systemPrompt)
+                    putJsonArray("parts") {
+                        addJsonObject { put("text", systemPrompt) }
                     }
                 }
             }
@@ -425,7 +425,7 @@ class AiRepository(
             val text = response.body?.string() ?: ""
             if (!response.isSuccessful) {
                 when (response.code) {
-                    429 -> throw AiError.RateLimited
+                    429 -> throw AiError.RateLimited()
                     401, 403 -> throw AiError.HttpError(response.code, "Invalid API key or access denied")
                     else -> throw AiError.HttpError(response.code, extractError(text))
                 }
@@ -442,7 +442,7 @@ class AiRepository(
                 if (!response.isSuccessful) {
                     val text = response.body?.string() ?: ""
                     when (response.code) {
-                        429 -> throw AiError.RateLimited
+                        429 -> throw AiError.RateLimited()
                         401, 403 -> throw AiError.HttpError(response.code, "Invalid API key or access denied")
                         else -> throw AiError.HttpError(response.code, extractError(text))
                     }
@@ -453,7 +453,7 @@ class AiRepository(
                 }
                 lines
             }
-        } ?: throw AiError.Timeout
+        } ?: throw AiError.Timeout()
 
     private fun extractError(body: String): String {
         return runCatching {
@@ -466,7 +466,7 @@ class AiRepository(
 
     private fun toAiError(e: Exception, provider: AiProvider): AiError = when (e) {
         is AiError -> e
-        is java.net.SocketTimeoutException -> AiError.Timeout
+        is java.net.SocketTimeoutException -> AiError.Timeout()
         is IOException -> AiError.HttpError(0, e.message ?: "Network error")
         else -> AiError.HttpError(0, e.message ?: e.javaClass.simpleName)
     }

@@ -1,6 +1,7 @@
 package com.nexarq.app.ui.screens
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -77,7 +78,7 @@ fun HexViewerScreen(path: String, navigator: Navigator) {
             if (loading) {
                 LoadingState("Reading…")
             } else {
-                androidx.compose.foundation.horizontalScroll(rememberScrollState()) {
+                androidx.compose.foundation.layout.Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState())) {
                     Column {
                         rows.forEach { row ->
                             Row(Modifier.padding(horizontal = 8.dp, vertical = 2.dp)) {

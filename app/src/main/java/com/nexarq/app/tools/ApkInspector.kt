@@ -67,7 +67,7 @@ object ApkInspector {
                 minSdk = runCatching { appInfo?.minSdkVersion }.getOrNull(),
                 targetSdk = runCatching { appInfo?.targetSdkVersion }.getOrNull(),
                 requestedPermissions = requested,
-                installLocation = installLocationName(appInfo?.installLocation),
+                installLocation = installLocationName(info.installLocation),
                 icon = icon,
                 fileSize = file.length(),
                 supportedAbis = abis,

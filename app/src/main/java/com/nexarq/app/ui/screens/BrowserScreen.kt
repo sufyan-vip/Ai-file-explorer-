@@ -136,19 +136,61 @@ fun BrowserScreen(path: String, navigator: Navigator) {
 
     LaunchedEffect(currentPath, showHidden, sortMode, navigator.current) { reload() }
 
-    fun runOp(kind: OperationKind, label: String, block: suspend ((OperationProgress) -> Unit) -> Unit, after: () -> Unit = {}) {
+    fun runOp(kind: OperationKind, label: String, block: suspend ((OperationProgress) -> Unit) -> Unit) {
         scope.launch {
-            try {
-                block { p -> container.operations.report(p) }
-                after()
-            } catch (e: Exception) {
-                if (e !is kotlinx.coroutines.CancellationException) {
-                    toast = e.message ?: "Operation failed"
-                }
+            val opId = System.nanoTime()
+            var last = OperationProgress(opId, kind, label)
+            container.operations.report(last)
+            val reportFn: (OperationProgress) -> Unit = { p ->
+                last = p.copy(operationId = opId, kind = kind, label = label, status = OperationStatus.RUNNING)
+                container.operations.report(last)
             }
+            try {
+                block(reportFn)
+                container.operations.report(last.copy(status = OperationStatus.COMPLETED))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                container.operations.report(last.copy(status = OperationStatus.CANCELLED))
+            } catch (e: Exception) {
+                container.operations.report(last.copy(status = OperationStatus.FAILED, error = e.message))
+                toast = e.message ?: "Operation failed"
+            }
+            reload()
         }
     }
 
+    // ---- helpers ----
+    fun toggleSelect(p: String) {
+        selection = if (p in selection) selection - p else selection + p
+    }
+
+    fun open(item: FileItem) {
+        if (selection.isNotEmpty()) { toggleSelect(item.path); return }
+        container.recents.record(item.path, item.name)
+        when {
+            item.isDirectory -> currentPath = item.path
+            ArchiveEngine.isArchiveFile(item.name) -> navigator.push(Screen.ArchiveViewer(item.path))
+            FileType.isImage(item.extension) -> navigator.push(Screen.ImagePreview(item.path))
+            FileType.isAudio(item.extension) -> navigator.push(Screen.AudioPlayer(item.path))
+            FileType.isTextLike(item.extension) || item.extension in setOf("txt", "md", "log", "json", "xml", "csv") ->
+                navigator.push(Screen.TextEditor(item.path))
+            item.extension == "apk" -> navigator.push(Screen.ApkInspector(item.path))
+            else -> Intents.openWith(context, item.path)
+        }
+    }
+
+    fun paste() {
+        val mode = Clipboard.mode
+        val sources = Clipboard.paths.toList()
+        runOp(if (mode == ClipboardMode.MOVE) OperationKind.MOVE else OperationKind.COPY,
+            if (mode == ClipboardMode.MOVE) "Moving" else "Copying") { report ->
+            if (mode == ClipboardMode.MOVE) {
+                FileSystem.move(sources, currentPath, conflict = com.nexarq.app.core.ConflictPolicy.RENAME) { report(it) }
+            } else {
+                FileSystem.copy(sources, currentPath, conflict = com.nexarq.app.core.ConflictPolicy.RENAME) { report(it) }
+            }
+            Clipboard.clear()
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -330,50 +372,20 @@ fun BrowserScreen(path: String, navigator: Navigator) {
         }
     }
 
-    // ---- helpers ----
-    fun toggleSelect(p: String) {
-        selection = if (p in selection) selection - p else selection + p
-    }
-
-    fun open(item: FileItem) {
-        if (selection.isNotEmpty()) { toggleSelect(item.path); return }
-        container.recents.record(item.path, item.name)
-        when {
-            item.isDirectory -> currentPath = item.path
-            ArchiveEngine.isArchiveFile(item.name) -> navigator.push(Screen.ArchiveViewer(item.path))
-            FileType.isImage(item.extension) -> navigator.push(Screen.ImagePreview(item.path))
-            FileType.isAudio(item.extension) -> navigator.push(Screen.AudioPlayer(item.path))
-            FileType.isTextLike(item.extension) || item.extension in setOf("txt", "md", "log", "json", "xml", "csv") ->
-                navigator.push(Screen.TextEditor(item.path))
-            item.extension == "apk" -> navigator.push(Screen.ApkInspector(item.path))
-            else -> Intents.openWith(context, item.path)
-        }
-    }
-
-    fun paste() {
-        val mode = Clipboard.mode
-        val sources = Clipboard.paths.toList()
-        runOp(if (mode == ClipboardMode.MOVE) OperationKind.MOVE else OperationKind.COPY,
-            if (mode == ClipboardMode.MOVE) "Moving" else "Copying") { report ->
-            if (mode == ClipboardMode.MOVE) {
-                FileSystem.move(sources, currentPath, conflict = com.nexarq.app.core.ConflictPolicy.RENAME) { report(it) }
-            } else {
-                FileSystem.copy(sources, currentPath, conflict = com.nexarq.app.core.ConflictPolicy.RENAME) { report(it) }
-            }
-            Clipboard.clear()
-        }
-    }
 }
 
 private fun sortItems(items: List<FileItem>, mode: String, folderFirst: Boolean): List<FileItem> {
     val comparator: Comparator<FileItem> = when (mode) {
-        "size" -> compareBy { it.size }
-        "date" -> compareBy { it.modified }
-        "type" -> compareBy { it.extension }.thenBy { it.name.lowercase() }
-        else -> compareBy { it.name.lowercase() }
+        "size" -> compareBy<FileItem> { it.size }
+        "date" -> compareByDescending<FileItem> { it.modified }
+        "type" -> compareBy<FileItem> { it.extension }.thenBy { it.name.lowercase() }
+        else -> compareBy<FileItem> { it.name.lowercase() }
     }
-    val dirComparator = if (folderFirst) compareByDescending<FileItem> { it.isDirectory } else compareBy { false }
-    return items.sortedWith(dirComparator.then(comparator))
+    return if (folderFirst) {
+        items.sortedWith(compareByDescending<FileItem> { it.isDirectory }.then(comparator))
+    } else {
+        items.sortedWith(comparator)
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -411,7 +423,6 @@ private fun FileRow(item: FileItem, selected: Boolean, onClick: () -> Unit, onLo
 private fun GridItem(item: FileItem, selection: Set<String>, onOpen: () -> Unit, onSelect: () -> Unit) {
     val selected = item.path in selection
     Card(
-        onClick = onOpen,
         modifier = Modifier.combinedClickable(onClick = onOpen, onLongClick = onSelect),
         colors = CardDefaults.cardColors(containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),

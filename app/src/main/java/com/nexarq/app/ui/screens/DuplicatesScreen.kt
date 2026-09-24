@@ -51,10 +51,10 @@ fun DuplicatesScreen(navigator: Navigator) {
     fun run() {
         scope.launch {
             running = true
-            groups = DuplicateFinder.find(listOf(root)) { p ->
+            groups = DuplicateFinder.find(listOf(root), onProgress = { p ->
                 scanned = if (p.phase == com.nexarq.app.tools.DuplicateScanProgress.Phase.HASHING)
                     "Hashing ${p.scanned}/${p.total}" else ""
-            }
+            })
             running = false
         }
     }

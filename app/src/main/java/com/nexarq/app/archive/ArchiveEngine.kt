@@ -3,6 +3,7 @@ package com.nexarq.app.archive
 import android.util.Log
 import com.nexarq.app.core.ArchiveEntry
 import com.nexarq.app.core.ConflictPolicy
+import com.nexarq.app.core.ConflictResolution
 import com.nexarq.app.core.FileSystem
 import com.nexarq.app.core.Format
 import com.nexarq.app.core.OperationKind
@@ -158,12 +159,12 @@ object ArchiveEngine {
                     size = e.size,
                     compressedSize = e.compressedSize,
                     modified = e.time,
-                    encrypted = e.isEncrypted,
+                    encrypted = e.generalPurposeBit.usesEncryption(),
                     method = methodName(e.method),
                     crc = e.crc,
                 )
             }
-            val comment = runCatching { zip.comment }.getOrNull()
+            val comment: String? = runCatching { Zip4jFile(file).comment }.getOrNull()?.takeIf { it.isNotBlank() }
             return buildListing(file.path, ArchiveFormat.ZIP, entries, comment, entries.any { it.encrypted })
         }
     }
@@ -185,8 +186,8 @@ object ArchiveEngine {
                         name = e.name.substringAfterLast('/'),
                         path = e.name,
                         isDirectory = e.isDirectory,
-                        size = if (e.hasStream) e.size else 0L,
-                        compressedSize = e.compressedSize.takeIf { it > 0 } ?: e.size,
+                        size = if (e.hasStream()) e.size else 0L,
+                        compressedSize = if (e.hasStream()) e.size else 0L,
                         modified = e.lastModifiedDate?.time ?: 0L,
                         encrypted = false,
                         method = e.contentMethods?.firstOrNull()?.method?.name,
@@ -351,7 +352,27 @@ object ArchiveEngine {
             conflict == ConflictPolicy.OVERWRITE -> ConflictResolution.OVERWRITE
             conflict == ConflictPolicy.SKIP -> ConflictResolution.SKIP
             conflict == ConflictPolicy.RENAME -> ConflictResolution.RENAME
-            else -> resolver(target.path)
+            else -> kotlinx.coroutines.runBlocking { resolver(target.path) }
+        }
+
+        fun drain(input: InputStream) {
+            val buf = ByteArray(64 * 1024)
+            while (input.read(buf) > 0) { cc.ensureActive() }
+        }
+
+        fun doWrite(input: InputStream, target: File, sizeHint: Long) {
+            target.parentFile?.mkdirs()
+            FileOutputStream(target).use { out ->
+                val buf = ByteArray(64 * 1024)
+                var r: Int
+                while (input.read(buf).also { r = it } > 0) {
+                    cc.ensureActive()
+                    out.write(buf, 0, r)
+                    processedBytes += r
+                    report(target.name)
+                }
+            }
+            processed++
         }
 
         fun writeStream(input: InputStream, target: File, sizeHint: Long) {
@@ -370,26 +391,6 @@ object ArchiveEngine {
             }
         }
 
-        fun doWrite(input: InputStream, target: File, sizeHint: Long) {
-            target.parentFile?.mkdirs()
-            FileOutputStream(target).use { out ->
-                val buf = ByteArray(64 * 1024)
-                var r: Int
-                while (input.read(buf).also { r = it } > 0) {
-                    cc.ensureActive()
-                    out.write(buf, 0, r)
-                    processedBytes += r
-                    report(target.name)
-                }
-            }
-            processed++
-        }
-
-        fun drain(input: InputStream) {
-            val buf = ByteArray(64 * 1024)
-            while (input.read(buf) > 0) { cc.ensureActive() }
-        }
-
         when (format) {
             ArchiveFormat.ZIP -> {
                 if (password != null) {
@@ -398,10 +399,10 @@ object ArchiveEngine {
                     for (entry in selected) {
                         cc.ensureActive()
                         if (entry.isDirectory) {
-                            val dir = FileSystem.safeJoin(destDir, entry.path) ?: throw SecurityException("Unsafe path: ${entry.path}")
+                            val dir = FileSystem.safeJoin(destDir, entry.path) ?: continue // skip unsafe entry
                             dir.mkdirs(); processed++; continue
                         }
-                        val target = FileSystem.safeJoin(destDir, entry.path) ?: throw SecurityException("Unsafe path: ${entry.path}")
+                        val target = FileSystem.safeJoin(destDir, entry.path) ?: continue // skip unsafe entry
                         val header = zf.getFileHeader(entry.path)
                         writeStream(zf.getInputStream(header), target, entry.size)
                     }
@@ -410,10 +411,10 @@ object ArchiveEngine {
                         for (entry in selected) {
                             cc.ensureActive()
                             if (entry.isDirectory) {
-                                val dir = FileSystem.safeJoin(destDir, entry.path) ?: throw SecurityException("Unsafe path: ${entry.path}")
+                                val dir = FileSystem.safeJoin(destDir, entry.path) ?: continue // skip unsafe entry
                                 dir.mkdirs(); processed++; continue
                             }
-                            val target = FileSystem.safeJoin(destDir, entry.path) ?: throw SecurityException("Unsafe path: ${entry.path}")
+                            val target = FileSystem.safeJoin(destDir, entry.path) ?: continue // skip unsafe entry
                             val ze = zip.getEntry(entry.path) ?: continue
                             writeStream(zip.getInputStream(ze), target, entry.size)
                         }
@@ -430,10 +431,10 @@ object ArchiveEngine {
                         val cur = e!!
                         if (cur.name !in wanted) continue
                         if (cur.isDirectory) {
-                            val dir = FileSystem.safeJoin(destDir, cur.name) ?: throw SecurityException("Unsafe path: ${cur.name}")
+                            val dir = FileSystem.safeJoin(destDir, cur.name) ?: continue // skip unsafe entry
                             dir.mkdirs(); processed++; continue
                         }
-                        val target = FileSystem.safeJoin(destDir, cur.name) ?: throw SecurityException("Unsafe path: ${cur.name}")
+                        val target = FileSystem.safeJoin(destDir, cur.name) ?: continue // skip unsafe entry
                         writeStream(seven.getInputStream(cur), target, cur.size)
                     }
                 }
@@ -468,10 +469,10 @@ object ArchiveEngine {
                     if (cur.name !in wanted) continue
                     report(cur.name)
                     if (cur.isDirectory) {
-                        val dir = FileSystem.safeJoin(destDir, cur.name) ?: throw SecurityException("Unsafe path: ${cur.name}")
+                        val dir = FileSystem.safeJoin(destDir, cur.name) ?: continue // skip unsafe entry
                         dir.mkdirs()
                     } else {
-                        val target = FileSystem.safeJoin(destDir, cur.name) ?: throw SecurityException("Unsafe path: ${cur.name}")
+                        val target = FileSystem.safeJoin(destDir, cur.name) ?: continue // skip unsafe entry
                         writeStream(tar, target, cur.size)
                     }
                 }
@@ -729,18 +730,20 @@ object ArchiveEngine {
             throw IOException("7z encryption is not supported by the built-in engine. Use ZIP for encrypted archives.")
         }
         SevenZOutputFile(outputFile).use { seven ->
-            seven.setContentMethods(listOf(
-                SevenZMethodConfiguration(SevenZMethod.LZMA2),
-                SevenZMethodConfiguration(SevenZMethod.COPY),
-            ))
-            seven.setContentCompression(options.compressionLevel)
+            val level = options.compressionLevel.coerceIn(0, 9)
+            seven.setContentMethods(
+                listOf(
+                    if (level == 0) SevenZMethodConfiguration(SevenZMethod.COPY)
+                    else SevenZMethodConfiguration(SevenZMethod.LZMA2, org.tukaani.xz.LZMA2Options(level))
+                )
+            )
             for (f in allFiles) {
                 cc.ensureActive()
                 report(f.name)
                 val name = entryNameFor(f, baseDir)
                 val entry = SevenZArchiveEntry().apply {
                     this.name = name
-                    this.hasStream = true
+                    this.setHasStream(true)
                     this.size = f.length()
                     this.lastModifiedDate = java.util.Date(f.lastModified())
                 }
