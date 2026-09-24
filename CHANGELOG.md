@@ -5,6 +5,19 @@ All notable changes to NEXARQ are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- CI build: resolved ~95 Kotlin compile errors (AI error types, archive engine
+  7z/zip API misuse, missing Compose imports, out-of-order local functions,
+  wrong trailing-lambda bindings) so lint, tests and `assembleDebug` pass.
+- File browser: operations (copy/move/delete/rename/new folder) now finish,
+  clear their progress bar and refresh the listing.
+- Storage access: the app now asks for "All files access" (Android 11+) or
+  storage permission (Android 10 and below) so the file browser can list files.
+- Archive extraction skips unsafe (absolute / traversal) entries instead of
+  aborting; `safeJoin` rejects absolute and drive-letter paths.
+- Default Gemini model updated to `gemini-2.5-flash`.
+
 ### Added
 
 - Trash / recycle bin: deletes move files to a restorable trash (app-private
