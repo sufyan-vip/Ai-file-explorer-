@@ -49,7 +49,10 @@ object FileSystem {
 
     /** Ensure [child] resolves inside [parent], preventing path traversal on extraction. */
     fun safeJoin(parent: File, childName: String): File? {
-        val clean = childName.replace('\\', '/').trimStart('/')
+        val unified = childName.replace('\\', '/')
+        // Absolute paths and Windows drive letters are never allowed inside an archive.
+        if (unified.startsWith("/") || Regex("^[A-Za-z]:").containsMatchIn(unified)) return null
+        val clean = unified.trimStart('/')
         if (clean.isEmpty()) return parent
         val target = File(parent, clean).canonicalFile
         val base = parent.canonicalFile

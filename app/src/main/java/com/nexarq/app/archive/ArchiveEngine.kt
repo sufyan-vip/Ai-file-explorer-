@@ -399,10 +399,10 @@ object ArchiveEngine {
                     for (entry in selected) {
                         cc.ensureActive()
                         if (entry.isDirectory) {
-                            val dir = FileSystem.safeJoin(destDir, entry.path) ?: throw SecurityException("Unsafe path: ${entry.path}")
+                            val dir = FileSystem.safeJoin(destDir, entry.path) ?: continue // skip unsafe entry
                             dir.mkdirs(); processed++; continue
                         }
-                        val target = FileSystem.safeJoin(destDir, entry.path) ?: throw SecurityException("Unsafe path: ${entry.path}")
+                        val target = FileSystem.safeJoin(destDir, entry.path) ?: continue // skip unsafe entry
                         val header = zf.getFileHeader(entry.path)
                         writeStream(zf.getInputStream(header), target, entry.size)
                     }
@@ -411,10 +411,10 @@ object ArchiveEngine {
                         for (entry in selected) {
                             cc.ensureActive()
                             if (entry.isDirectory) {
-                                val dir = FileSystem.safeJoin(destDir, entry.path) ?: throw SecurityException("Unsafe path: ${entry.path}")
+                                val dir = FileSystem.safeJoin(destDir, entry.path) ?: continue // skip unsafe entry
                                 dir.mkdirs(); processed++; continue
                             }
-                            val target = FileSystem.safeJoin(destDir, entry.path) ?: throw SecurityException("Unsafe path: ${entry.path}")
+                            val target = FileSystem.safeJoin(destDir, entry.path) ?: continue // skip unsafe entry
                             val ze = zip.getEntry(entry.path) ?: continue
                             writeStream(zip.getInputStream(ze), target, entry.size)
                         }
@@ -431,10 +431,10 @@ object ArchiveEngine {
                         val cur = e!!
                         if (cur.name !in wanted) continue
                         if (cur.isDirectory) {
-                            val dir = FileSystem.safeJoin(destDir, cur.name) ?: throw SecurityException("Unsafe path: ${cur.name}")
+                            val dir = FileSystem.safeJoin(destDir, cur.name) ?: continue // skip unsafe entry
                             dir.mkdirs(); processed++; continue
                         }
-                        val target = FileSystem.safeJoin(destDir, cur.name) ?: throw SecurityException("Unsafe path: ${cur.name}")
+                        val target = FileSystem.safeJoin(destDir, cur.name) ?: continue // skip unsafe entry
                         writeStream(seven.getInputStream(cur), target, cur.size)
                     }
                 }
@@ -469,10 +469,10 @@ object ArchiveEngine {
                     if (cur.name !in wanted) continue
                     report(cur.name)
                     if (cur.isDirectory) {
-                        val dir = FileSystem.safeJoin(destDir, cur.name) ?: throw SecurityException("Unsafe path: ${cur.name}")
+                        val dir = FileSystem.safeJoin(destDir, cur.name) ?: continue // skip unsafe entry
                         dir.mkdirs()
                     } else {
-                        val target = FileSystem.safeJoin(destDir, cur.name) ?: throw SecurityException("Unsafe path: ${cur.name}")
+                        val target = FileSystem.safeJoin(destDir, cur.name) ?: continue // skip unsafe entry
                         writeStream(tar, target, cur.size)
                     }
                 }
