@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(navigator: Navigator) {
     val container = LocalContainer.current ?: return
-    val settings by container.settings.settings.collectAsState()
+    val settings by container.settings.settings.collectAsState(initial = SettingsRepository.AppSettings())
     val scope = rememberCoroutineScope()
 
     Scaffold(
@@ -54,30 +54,35 @@ fun SettingsScreen(navigator: Navigator) {
             item { SectionTitle("Appearance") }
             item {
                 SegmentedSetting("Theme", listOf("system", "light", "dark"), settings.theme,
-                    labels = listOf("System", "Light", "Dark")) { container.settings.setTheme(it) }
+                    labels = listOf("System", "Light", "Dark")) { scope.launch { container.settings.setTheme(it) } }
             }
-            item { SwitchSetting("Dynamic colors", settings.dynamicColors) { container.settings.setDynamicColors(it) } }
+            item { SwitchSetting("Dynamic colors", settings.dynamicColors) { scope.launch { container.settings.setDynamicColors(it) } } }
             item {
                 SegmentedSetting("Default view", listOf("list", "grid"), settings.viewMode,
-                    labels = listOf("List", "Grid")) { container.settings.setViewMode(it) }
+                    labels = listOf("List", "Grid")) { scope.launch { container.settings.setViewMode(it) } }
             }
 
             item { SectionTitle("File browser") }
-            item { SwitchSetting("Show hidden files", settings.showHidden) { container.settings.setShowHidden(it) } }
-            item { SwitchSetting("Show file extensions", settings.showExtensions) { container.settings.setShowExtensions(it) } }
-            item { SwitchSetting("Folders first", settings.folderFirst) { container.settings.setFolderFirst(it) } }
-            item { SwitchSetting("Confirm before delete", settings.confirmDelete) { container.settings.setConfirmDelete(it) } }
-            item { SwitchSetting("Confirm before overwrite", settings.confirmOverwrite) { container.settings.setConfirmOverwrite(it) } }
-            item { SwitchSetting("Recent files history", settings.recentEnabled) { container.settings.setRecentEnabled(it) } }
+            item { SwitchSetting("Show hidden files", settings.showHidden) { scope.launch { container.settings.setShowHidden(it) } } }
+            item { SwitchSetting("Show file extensions", settings.showExtensions) { scope.launch { container.settings.setShowExtensions(it) } } }
+            item { SwitchSetting("Folders first", settings.folderFirst) { scope.launch { container.settings.setFolderFirst(it) } } }
+            item { SwitchSetting("Confirm before delete", settings.confirmDelete) { scope.launch { container.settings.setConfirmDelete(it) } } }
+            item { SwitchSetting("Move deleted files to trash", settings.useTrash) { scope.launch { container.settings.setUseTrash(it) } } }
+            item {
+                SegmentedSetting("Auto-empty trash", listOf("7", "30", "90"), settings.trashRetentionDays.toString(),
+                    labels = listOf("7 days", "30 days", "90 days")) { scope.launch { container.settings.setTrashRetentionDays(it.toInt()) } }
+            }
+            item { SwitchSetting("Confirm before overwrite", settings.confirmOverwrite) { scope.launch { container.settings.setConfirmOverwrite(it) } } }
+            item { SwitchSetting("Recent files history", settings.recentEnabled) { scope.launch { container.settings.setRecentEnabled(it) } } }
             item {
                 SegmentedSetting("Sort by", listOf("name", "size", "date", "type"), settings.sortMode,
-                    labels = listOf("Name", "Size", "Date", "Type")) { container.settings.setSortMode(it) }
+                    labels = listOf("Name", "Size", "Date", "Type")) { scope.launch { container.settings.setSortMode(it) } }
             }
 
             item { SectionTitle("Archive") }
             item {
                 SegmentedSetting("Default format", listOf("zip", "7z", "tar", "tar.gz"), settings.defaultFormat,
-                    labels = listOf("ZIP", "7Z", "TAR", "TAR.GZ")) { container.settings.setDefaultFormat(it) }
+                    labels = listOf("ZIP", "7Z", "TAR", "TAR.GZ")) { scope.launch { container.settings.setDefaultFormat(it) } }
             }
             item {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -96,7 +101,7 @@ fun SettingsScreen(navigator: Navigator) {
                         Text("Root detected: ${RootManager.isRooted()}", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Switch(checked = settings.rootEnabled, onCheckedChange = { container.settings.setRootEnabled(it) })
+                    Switch(checked = settings.rootEnabled, onCheckedChange = { scope.launch { container.settings.setRootEnabled(it) } })
                 }
             }
 

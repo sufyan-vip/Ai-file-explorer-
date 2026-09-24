@@ -164,6 +164,18 @@ data class ChatMessage(
     enum class Role { USER, ASSISTANT, SYSTEM, ERROR }
 }
 
+/** A file or folder sitting in the recycle bin, awaiting restore or permanent deletion. */
+@kotlinx.serialization.Serializable
+data class TrashedItem(
+    val id: Long,
+    val name: String,
+    val originalPath: String,
+    val trashPath: String,
+    val isDirectory: Boolean,
+    val size: Long,
+    val trashedAt: Long = System.currentTimeMillis(),
+)
+
 /** Common date formatter used across the app. */
 object TimeFormat {
     private val fmt = java.text.SimpleDateFormat("MMM d, yyyy HH:mm", java.util.Locale.getDefault())

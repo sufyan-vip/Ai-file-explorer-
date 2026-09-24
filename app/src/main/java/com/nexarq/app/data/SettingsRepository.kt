@@ -37,6 +37,8 @@ class SettingsRepository(private val context: Context) {
         val aiMetadataOnly = booleanPreferencesKey("ai_metadata_only")
         val viewMode = stringPreferencesKey("view_mode")
         val sortMode = stringPreferencesKey("sort_mode")
+        val useTrash = booleanPreferencesKey("use_trash")
+        val trashRetentionDays = intPreferencesKey("trash_retention_days")
     }
 
     data class AppSettings(
@@ -58,6 +60,8 @@ class SettingsRepository(private val context: Context) {
         val aiMetadataOnly: Boolean = true,
         val viewMode: String = "list",
         val sortMode: String = "name",
+        val useTrash: Boolean = true,
+        val trashRetentionDays: Int = 30,
     )
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -80,6 +84,8 @@ class SettingsRepository(private val context: Context) {
             aiMetadataOnly = p[Keys.aiMetadataOnly] ?: true,
             viewMode = p[Keys.viewMode] ?: "list",
             sortMode = p[Keys.sortMode] ?: "name",
+            useTrash = p[Keys.useTrash] ?: true,
+            trashRetentionDays = p[Keys.trashRetentionDays] ?: 30,
         )
     }
 
@@ -103,6 +109,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAiMetadataOnly(value: Boolean) = edit { it[Keys.aiMetadataOnly] = value }
     suspend fun setViewMode(value: String) = edit { it[Keys.viewMode] = value }
     suspend fun setSortMode(value: String) = edit { it[Keys.sortMode] = value }
+    suspend fun setUseTrash(value: Boolean) = edit { it[Keys.useTrash] = value }
+    suspend fun setTrashRetentionDays(value: Int) = edit { it[Keys.trashRetentionDays] = value }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.dataStore.edit(block)

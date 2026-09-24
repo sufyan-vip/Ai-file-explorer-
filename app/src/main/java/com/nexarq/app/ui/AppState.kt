@@ -28,6 +28,10 @@ sealed class Screen {
     data object Settings : Screen()
     data object Operations : Screen()
     data object RootBrowser : Screen()
+    data object Trash : Screen()
+    data class Crypto(val path: String, val encrypt: Boolean) : Screen()
+    data class WifiTransfer(val dir: String) : Screen()
+    data class AudioPlayer(val path: String) : Screen()
     data object About : Screen()
 }
 

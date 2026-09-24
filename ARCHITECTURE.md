@@ -42,7 +42,22 @@
 - `SecureStore` — Android Keystore AES/GCM encryption for AI keys / saved secrets.
 - `JsonStore` — atomic JSON persistence for small lists.
 - `RecentsRepository`, `BookmarkRepository`, `PresetRepository` — persistent lists.
+- `TrashRepository` — persistent metadata index of the recycle bin.
 - `OperationManager` — active-operation progress + persisted history.
+
+### `trash/`
+- `TrashManager` — recycle bin engine: move-to-trash, restore (with collision-safe
+  rename), permanent delete, empty-trash, and retention-based auto-purge. Trash
+  lives in app-private storage.
+
+### `transfer/`
+- `HttpFileServer` — dependency-free embedded HTTP server for Wi-Fi transfer:
+  directory listing UI, file download, and streaming multipart upload. All paths
+  validated with `FileSystem.safeJoin`.
+
+### `audio/`
+- `AudioPlayer` — MediaPlayer-backed audio playback with observable state
+  (prepared/playing/position/duration) and background position polling.
 
 ### `ai/`
 - `AiRepository` — Gemini (`generateContent` / `streamGenerateContent`) and
@@ -52,7 +67,8 @@
 ### `search/`, `tools/`
 - `SearchEngine` — bounded, rooted, filterable local search.
 - `tools/` — `Hashing`, `ApkInspector`, `TextFile`, `HexViewer`, `DuplicateFinder`,
-  `StorageAnalyzer`, `BatchRenamer`, `FileCompare`, `LogAnalyzer`.
+  `StorageAnalyzer`, `BatchRenamer`, `FileCompare`, `LogAnalyzer`, `CryptoFile`
+  (AES-256-GCM file encryption).
 
 ### `ui/`
 - Single-activity Compose app. Screens in `ui/screens/`, shared components in

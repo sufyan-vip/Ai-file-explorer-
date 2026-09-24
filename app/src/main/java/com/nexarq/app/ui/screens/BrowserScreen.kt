@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.Search
@@ -72,6 +74,9 @@ import com.nexarq.app.core.OperationKind
 import com.nexarq.app.core.OperationProgress
 import com.nexarq.app.core.OperationStatus
 import com.nexarq.app.core.TimeFormat
+import com.nexarq.app.data.SettingsRepository
+import com.nexarq.app.tools.CryptoFile
+import com.nexarq.app.trash.TrashManager
 import com.nexarq.app.ui.Clipboard
 import com.nexarq.app.ui.ClipboardMode
 import com.nexarq.app.ui.LocalContainer
@@ -93,7 +98,7 @@ fun BrowserScreen(path: String, navigator: Navigator) {
     val container = LocalContainer.current ?: return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val settings by container.settings.settings.collectAsState()
+    val settings by container.settings.settings.collectAsState(initial = SettingsRepository.AppSettings())
     val activeOps by container.operations.active.collectAsState()
 
     var currentPath by remember { mutableStateOf(path) }
@@ -129,7 +134,7 @@ fun BrowserScreen(path: String, navigator: Navigator) {
         }
     }
 
-    LaunchedEffect(currentPath, showHidden, sortMode) { reload() }
+    LaunchedEffect(currentPath, showHidden, sortMode, navigator.current) { reload() }
 
     fun runOp(kind: OperationKind, label: String, block: suspend ((OperationProgress) -> Unit) -> Unit, after: () -> Unit = {}) {
         scope.launch {
@@ -221,6 +226,7 @@ fun BrowserScreen(path: String, navigator: Navigator) {
 
             // Selection action bar
             if (selection.isNotEmpty()) {
+                val singleFile = selection.singleOrNull()?.let { File(it) }?.takeIf { it.isFile }
                 SelectionBar(
                     count = selection.size,
                     onCancel = { selection = emptySet() },
@@ -229,6 +235,18 @@ fun BrowserScreen(path: String, navigator: Navigator) {
                     onDelete = { confirmDelete = true },
                     onShare = { Intents.shareMultiple(context, selection.toList()); selection = emptySet() },
                     onCompress = { showCompress = true },
+                    onEncrypt = if (singleFile != null && !CryptoFile.isEncryptedFile(singleFile.name)) {
+                        {
+                            navigator.push(Screen.Crypto(singleFile.absolutePath, encrypt = true))
+                            selection = emptySet()
+                        }
+                    } else null,
+                    onDecrypt = if (singleFile != null && CryptoFile.isEncryptedFile(singleFile.name)) {
+                        {
+                            navigator.push(Screen.Crypto(singleFile.absolutePath, encrypt = false))
+                            selection = emptySet()
+                        }
+                    } else null,
                 )
             }
         }
@@ -271,16 +289,20 @@ fun BrowserScreen(path: String, navigator: Navigator) {
         }, onDismiss = { showJump = false })
     }
     if (confirmDelete) {
+        val useTrash = settings.useTrash
         ConfirmDialog(
-            title = "Delete ${selection.size} item(s)?",
-            message = "This will permanently delete the selected files and folders.\n\n" + selection.take(5).joinToString("\n") { "• $it" },
-            confirmLabel = "Delete", destructive = true,
+            title = if (useTrash) "Move ${selection.size} item(s) to trash?" else "Delete ${selection.size} item(s)?",
+            message = (if (useTrash) "The selected files and folders will be moved to the trash. You can restore them from Tools → Trash bin."
+                else "This will permanently delete the selected files and folders.") +
+                    "\n\n" + selection.take(5).joinToString("\n") { "• $it" },
+            confirmLabel = if (useTrash) "Move to trash" else "Delete", destructive = !useTrash,
             onConfirm = {
                 val targets = selection.toList()
                 confirmDelete = false
                 selection = emptySet()
-                runOp(OperationKind.DELETE, "Deleting") { report ->
-                    FileSystem.delete(targets) { report(it) }
+                runOp(OperationKind.DELETE, if (useTrash) "Moving to trash" else "Deleting") { report ->
+                    if (useTrash) TrashManager.moveToTrash(context, container.trash, targets) { report(it) }
+                    else FileSystem.delete(targets) { report(it) }
                 }
             },
             onDismiss = { confirmDelete = false },
@@ -320,6 +342,7 @@ fun BrowserScreen(path: String, navigator: Navigator) {
             item.isDirectory -> currentPath = item.path
             ArchiveEngine.isArchiveFile(item.name) -> navigator.push(Screen.ArchiveViewer(item.path))
             FileType.isImage(item.extension) -> navigator.push(Screen.ImagePreview(item.path))
+            FileType.isAudio(item.extension) -> navigator.push(Screen.AudioPlayer(item.path))
             FileType.isTextLike(item.extension) || item.extension in setOf("txt", "md", "log", "json", "xml", "csv") ->
                 navigator.push(Screen.TextEditor(item.path))
             item.extension == "apk" -> navigator.push(Screen.ApkInspector(item.path))
@@ -404,6 +427,7 @@ private fun GridItem(item: FileItem, selection: Set<String>, onOpen: () -> Unit,
 private fun SelectionBar(
     count: Int, onCancel: () -> Unit, onCopy: () -> Unit, onMove: () -> Unit,
     onDelete: () -> Unit, onShare: () -> Unit, onCompress: () -> Unit,
+    onEncrypt: (() -> Unit)? = null, onDecrypt: (() -> Unit)? = null,
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -412,6 +436,8 @@ private fun SelectionBar(
             IconButton(onClick = onCopy) { Icon(Icons.Default.ContentCopy, "Copy") }
             IconButton(onClick = onMove) { Icon(Icons.Default.DriveFileMove, "Move") }
             IconButton(onClick = onCompress) { Icon(Icons.Default.Archive, "Compress") }
+            onEncrypt?.let { IconButton(onClick = it) { Icon(Icons.Default.Lock, "Encrypt") } }
+            onDecrypt?.let { IconButton(onClick = it) { Icon(Icons.Default.LockOpen, "Decrypt") } }
             IconButton(onClick = onShare) { Icon(Icons.Default.Share, "Share") }
             IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }
         }

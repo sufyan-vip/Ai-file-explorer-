@@ -18,6 +18,14 @@ affiliated with, endorsed by, or derived from ZArchiver.
   ZIP (AES) create/extract. Entry preview, search and metadata.
 - **Root mode** — safe `su` abstraction, root file browser with permissions/ownership,
   chmod/chown, symlink creation, mount info. Strictly validated, timeout-guarded.
+- **Trash bin** — deleted files move to a recycle bin instead of vanishing: restore
+  them, delete them permanently, or let the bin auto-empty after 7/30/90 days.
+- **File encryption** — password-based AES-256-GCM encryption/decryption (`.nxq`
+  files); a wrong password fails loudly instead of producing garbage.
+- **Wi-Fi transfer** — an embedded HTTP server shares a folder with any browser on
+  the same network: browse, download and upload files, no cables or accounts.
+- **Audio player** — built-in player for MP3/AAC/OGG/FLAC/WAV with seek slider and
+  ±10-second skip.
 - **Tools** — storage analyzer, duplicate finder, hash calculator (MD5/SHA-1/SHA-256/
   SHA-512), APK inspector, text editor, hex viewer, batch renamer, file comparison,
   log analyzer.

@@ -15,11 +15,13 @@ import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FindInPage
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.nexarq.app.ui.Navigator
 import com.nexarq.app.ui.Screen
+import com.nexarq.app.ui.defaultStoragePath
 
 private data class Tool(val title: String, val icon: ImageVector, val route: Screen)
 
@@ -46,6 +49,8 @@ fun ToolsScreen(navigator: Navigator) {
         Tool("Storage analyzer", Icons.Default.Dashboard, Screen.Analyzer),
         Tool("Duplicate finder", Icons.Default.ContentCopy, Screen.Duplicates),
         Tool("Hash calculator", Icons.Default.Calculate, Screen.HashTool),
+        Tool("Trash bin", Icons.Default.Delete, Screen.Trash),
+        Tool("Wi-Fi transfer", Icons.Default.Wifi, Screen.WifiTransfer(defaultStoragePath())),
         Tool("Batch rename", Icons.Default.DriveFileRenameOutline, Screen.Search),
         Tool("File compare", Icons.Default.Compare, Screen.Search),
         Tool("APK inspector", Icons.Default.Security, Screen.Search),

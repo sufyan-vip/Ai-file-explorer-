@@ -3,6 +3,21 @@
 All notable changes to NEXARQ are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) with [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Trash / recycle bin: deletes move files to a restorable trash (app-private
+  storage), with per-item restore, permanent delete, empty-trash, and automatic
+  expiry after 7/30/90 days (configurable in Settings).
+- File encryption: AES-256-GCM password-based encryption/decryption producing
+  `.nxq` files, with streaming progress and wrong-password detection. Available
+  from the browser selection bar for single files.
+- Wi-Fi transfer: embedded dependency-free HTTP server — share a folder with any
+  browser on the same network to browse, download and upload files (Tools menu).
+- Built-in audio player: play MP3/AAC/OGG/FLAC/WAV/MIDI from the browser with
+  seek slider, ±10-second skip and live position tracking.
+
 ## [1.0.0] — 2026-09-11
 
 ### Added

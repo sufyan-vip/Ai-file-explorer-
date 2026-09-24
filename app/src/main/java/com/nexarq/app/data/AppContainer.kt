@@ -19,5 +19,6 @@ class AppContainer(context: Context) {
     val bookmarks = BookmarkRepository(store)
     val presets = PresetRepository(store)
     val operations = OperationManager(store)
+    val trash = TrashRepository(store)
     val ai = AiRepository(appContext, secureStore, store)
 }

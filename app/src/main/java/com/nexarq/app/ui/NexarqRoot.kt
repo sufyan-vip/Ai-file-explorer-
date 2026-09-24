@@ -25,13 +25,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.nexarq.app.data.AppContainer
+import com.nexarq.app.data.SettingsRepository
 import com.nexarq.app.ui.screens.AboutScreen
 import com.nexarq.app.ui.screens.AiCenterScreen
 import com.nexarq.app.ui.screens.AnalyzerScreen
 import com.nexarq.app.ui.screens.ApkInspectorScreen
 import com.nexarq.app.ui.screens.ArchiveViewerScreen
+import com.nexarq.app.ui.screens.AudioPlayerScreen
 import com.nexarq.app.ui.screens.BatchRenameScreen
 import com.nexarq.app.ui.screens.BrowserScreen
+import com.nexarq.app.ui.screens.CryptoScreen
 import com.nexarq.app.ui.screens.DuplicatesScreen
 import com.nexarq.app.ui.screens.FileCompareScreen
 import com.nexarq.app.ui.screens.HashScreen
@@ -44,6 +47,8 @@ import com.nexarq.app.ui.screens.SearchScreen
 import com.nexarq.app.ui.screens.SettingsScreen
 import com.nexarq.app.ui.screens.TextEditorScreen
 import com.nexarq.app.ui.screens.ToolsScreen
+import com.nexarq.app.ui.screens.TransferScreen
+import com.nexarq.app.ui.screens.TrashScreen
 import com.nexarq.app.ui.theme.NexarqTheme
 
 fun defaultStoragePath(): String {
@@ -56,7 +61,7 @@ fun defaultStoragePath(): String {
 
 @Composable
 fun NexarqRoot(container: AppContainer) {
-    val settings by container.settings.settings.collectAsState()
+    val settings by container.settings.settings.collectAsState(initial = SettingsRepository.AppSettings())
     NexarqTheme(themeOverride = settings.theme, dynamicColors = settings.dynamicColors) {
         CompositionLocalProvider(LocalContainer provides container) {
             AppScaffold(container = container)
@@ -126,6 +131,10 @@ private fun AppScaffold(container: AppContainer) {
                 is Screen.Settings -> SettingsScreen(navigator)
                 is Screen.Operations -> OperationsScreen(navigator)
                 is Screen.RootBrowser -> RootBrowserScreen(navigator)
+                is Screen.Trash -> TrashScreen(navigator)
+                is Screen.Crypto -> CryptoScreen(path = screen.path, encrypt = screen.encrypt, navigator = navigator)
+                is Screen.WifiTransfer -> TransferScreen(dir = screen.dir, navigator = navigator)
+                is Screen.AudioPlayer -> AudioPlayerScreen(path = screen.path, navigator = navigator)
                 is Screen.About -> AboutScreen(navigator)
             }
         }
