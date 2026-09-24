@@ -110,16 +110,15 @@ object RootManager {
         outThread.start()
         errThread.start()
 
-        val result = withTimeoutOrNull(timeoutMs) {
+        runCatching {
             process.outputStream.use { os ->
                 os.write(commandLine.toByteArray())
                 os.flush()
             }
-            process.waitFor()
-            ShellResult(process.exitValue(), stdout.toString(), stderr.toString(), timedOut = false)
         }
+        val finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
 
-        if (result == null) {
+        if (!finished) {
             process.destroy()
             runCatching { process.waitFor(2, TimeUnit.SECONDS) }
             process.destroyForcibly()
@@ -127,7 +126,7 @@ object RootManager {
         }
         outThread.join(2000)
         errThread.join(2000)
-        return result
+        return ShellResult(process.exitValue(), stdout.toString(), stderr.toString(), timedOut = false)
     }
 
     private fun shellQuote(arg: String): String = "'" + arg.replace("'", "'\\''") + "'"

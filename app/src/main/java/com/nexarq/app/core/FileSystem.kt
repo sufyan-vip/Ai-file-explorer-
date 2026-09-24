@@ -300,7 +300,7 @@ object StorageInfo {
                 totalBytes = stat.totalBytes,
                 availableBytes = stat.availableBytes,
                 freeBytes = stat.freeBytes,
-                blockSize = stat.blockSize,
+                blockSize = stat.blockSizeLong,
             )
         } catch (_: Exception) {
             null

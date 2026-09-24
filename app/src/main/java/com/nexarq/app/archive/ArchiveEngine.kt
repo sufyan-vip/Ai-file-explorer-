@@ -3,6 +3,7 @@ package com.nexarq.app.archive
 import android.util.Log
 import com.nexarq.app.core.ArchiveEntry
 import com.nexarq.app.core.ConflictPolicy
+import com.nexarq.app.core.ConflictResolution
 import com.nexarq.app.core.FileSystem
 import com.nexarq.app.core.Format
 import com.nexarq.app.core.OperationKind
@@ -158,12 +159,12 @@ object ArchiveEngine {
                     size = e.size,
                     compressedSize = e.compressedSize,
                     modified = e.time,
-                    encrypted = e.isEncrypted,
+                    encrypted = e.generalPurposeBit.usesEncryption(),
                     method = methodName(e.method),
                     crc = e.crc,
                 )
             }
-            val comment = runCatching { zip.comment }.getOrNull()
+            val comment: String? = runCatching { Zip4jFile(file).comment }.getOrNull()?.takeIf { it.isNotBlank() }
             return buildListing(file.path, ArchiveFormat.ZIP, entries, comment, entries.any { it.encrypted })
         }
     }
@@ -185,8 +186,8 @@ object ArchiveEngine {
                         name = e.name.substringAfterLast('/'),
                         path = e.name,
                         isDirectory = e.isDirectory,
-                        size = if (e.hasStream) e.size else 0L,
-                        compressedSize = e.compressedSize.takeIf { it > 0 } ?: e.size,
+                        size = if (e.hasStream()) e.size else 0L,
+                        compressedSize = if (e.hasStream()) e.size else 0L,
                         modified = e.lastModifiedDate?.time ?: 0L,
                         encrypted = false,
                         method = e.contentMethods?.firstOrNull()?.method?.name,
@@ -351,23 +352,12 @@ object ArchiveEngine {
             conflict == ConflictPolicy.OVERWRITE -> ConflictResolution.OVERWRITE
             conflict == ConflictPolicy.SKIP -> ConflictResolution.SKIP
             conflict == ConflictPolicy.RENAME -> ConflictResolution.RENAME
-            else -> resolver(target.path)
+            else -> kotlinx.coroutines.runBlocking { resolver(target.path) }
         }
 
-        fun writeStream(input: InputStream, target: File, sizeHint: Long) {
-            when (resolveConflict(target)) {
-                ConflictResolution.SKIP -> { drain(input); return }
-                ConflictResolution.CANCEL -> throw kotlinx.coroutines.CancellationException("Cancelled by user")
-                ConflictResolution.RENAME -> {
-                    var i = 1
-                    var t = target
-                    val base = target.name.substringBeforeLast('.', target.name)
-                    val ext = target.name.substringAfterLast('.').let { if (it == target.name) "" else ".$it" }
-                    while (t.exists()) t = File(target.parentFile, "$base ($i)$ext").also { i++ }
-                    doWrite(input, t, sizeHint)
-                }
-                else -> doWrite(input, target, sizeHint)
-            }
+        fun drain(input: InputStream) {
+            val buf = ByteArray(64 * 1024)
+            while (input.read(buf) > 0) { cc.ensureActive() }
         }
 
         fun doWrite(input: InputStream, target: File, sizeHint: Long) {
@@ -385,9 +375,20 @@ object ArchiveEngine {
             processed++
         }
 
-        fun drain(input: InputStream) {
-            val buf = ByteArray(64 * 1024)
-            while (input.read(buf) > 0) { cc.ensureActive() }
+        fun writeStream(input: InputStream, target: File, sizeHint: Long) {
+            when (resolveConflict(target)) {
+                ConflictResolution.SKIP -> { drain(input); return }
+                ConflictResolution.CANCEL -> throw kotlinx.coroutines.CancellationException("Cancelled by user")
+                ConflictResolution.RENAME -> {
+                    var i = 1
+                    var t = target
+                    val base = target.name.substringBeforeLast('.', target.name)
+                    val ext = target.name.substringAfterLast('.').let { if (it == target.name) "" else ".$it" }
+                    while (t.exists()) t = File(target.parentFile, "$base ($i)$ext").also { i++ }
+                    doWrite(input, t, sizeHint)
+                }
+                else -> doWrite(input, target, sizeHint)
+            }
         }
 
         when (format) {
@@ -729,18 +730,20 @@ object ArchiveEngine {
             throw IOException("7z encryption is not supported by the built-in engine. Use ZIP for encrypted archives.")
         }
         SevenZOutputFile(outputFile).use { seven ->
-            seven.setContentMethods(listOf(
-                SevenZMethodConfiguration(SevenZMethod.LZMA2),
-                SevenZMethodConfiguration(SevenZMethod.COPY),
-            ))
-            seven.setContentCompression(options.compressionLevel)
+            val level = options.compressionLevel.coerceIn(0, 9)
+            seven.setContentMethods(
+                listOf(
+                    if (level == 0) SevenZMethodConfiguration(SevenZMethod.COPY)
+                    else SevenZMethodConfiguration(SevenZMethod.LZMA2, org.tukaani.xz.LZMA2Options(level))
+                )
+            )
             for (f in allFiles) {
                 cc.ensureActive()
                 report(f.name)
                 val name = entryNameFor(f, baseDir)
                 val entry = SevenZArchiveEntry().apply {
                     this.name = name
-                    this.hasStream = true
+                    this.setHasStream(true)
                     this.size = f.length()
                     this.lastModifiedDate = java.util.Date(f.lastModified())
                 }

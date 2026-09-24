@@ -1,6 +1,8 @@
 package com.nexarq.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -100,6 +102,31 @@ fun ArchiveViewerScreen(path: String, navigator: Navigator) {
                     error = e.message
                 }
             loading = false
+        }
+    }
+
+    fun preview(entry: ArchiveEntry) {
+        if (entry.isDirectory) return
+        if (entry.size > 256 * 1024) { toast = "Entry too large to preview"; return }
+        scope.launch {
+            runCatching {
+                val p = ArchiveEngine.preview(path, entry.path, password?.toCharArray())
+                String(p.bytes, Charsets.UTF_8)
+            }.onSuccess { previewText = it }
+                .onFailure { toast = it.message }
+        }
+    }
+
+    fun extractOne(entry: ArchiveEntry) {
+        scope.launch {
+            val dest = "${File(path).parentFile?.absolutePath}/${File(path).nameWithoutExtension}"
+            runCatching {
+                ArchiveEngine.extract(path, dest, password?.toCharArray(),
+                    entryFilter = { it.path == entry.path },
+                    conflict = com.nexarq.app.core.ConflictPolicy.ASK,
+                    resolver = { com.nexarq.app.core.ConflictResolution.OVERWRITE }) { progress = it }
+            }.onSuccess { toast = "Extracted to $dest" }
+                .onFailure { toast = it.message }
         }
     }
 
@@ -240,7 +267,7 @@ fun ArchiveViewerScreen(path: String, navigator: Navigator) {
             onDismissRequest = { previewText = null },
             title = { Text("Preview") },
             text = {
-                androidx.compose.foundation.verticalScroll(androidx.compose.foundation.rememberScrollState()) {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     Text(text, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
                 }
             },
@@ -260,30 +287,6 @@ fun ArchiveViewerScreen(path: String, navigator: Navigator) {
         }
     }
 
-    fun preview(entry: ArchiveEntry) {
-        if (entry.isDirectory) return
-        if (entry.size > 256 * 1024) { toast = "Entry too large to preview"; return }
-        scope.launch {
-            runCatching {
-                val p = ArchiveEngine.preview(path, entry.path, password?.toCharArray())
-                String(p.bytes, Charsets.UTF_8)
-            }.onSuccess { previewText = it }
-                .onFailure { toast = it.message }
-        }
-    }
-
-    fun extractOne(entry: ArchiveEntry) {
-        scope.launch {
-            val dest = "${File(path).parentFile?.absolutePath}/${File(path).nameWithoutExtension}"
-            runCatching {
-                ArchiveEngine.extract(path, dest, password?.toCharArray(),
-                    entryFilter = { it.path == entry.path },
-                    conflict = com.nexarq.app.core.ConflictPolicy.ASK,
-                    resolver = { com.nexarq.app.core.ConflictResolution.OVERWRITE }) { progress = it }
-            }.onSuccess { toast = "Extracted to $dest" }
-                .onFailure { toast = it.message }
-        }
-    }
 }
 
 @Composable

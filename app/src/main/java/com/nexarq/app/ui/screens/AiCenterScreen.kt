@@ -369,6 +369,6 @@ private fun ProviderCard(
 
 private val AiProvider.defaultModelHint: String
     get() = when (this) {
-        AiProvider.GEMINI -> "gemini-1.5-flash"
+        AiProvider.GEMINI -> "gemini-2.5-flash"
         AiProvider.OPENROUTER -> "openai/gpt-4o-mini"
     }
