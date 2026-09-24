@@ -44,10 +44,15 @@ if (System.getenv("GITHUB_ACTIONS") == "true") {
             lines.add("FAILURE: ${f.javaClass.name}: ${f.message}")
             f = f.cause; depth++
         }
-        println("::warning title=diag-count::${lines.size} lines")
-        lines.take(600).chunked(40).forEachIndexed { i, c ->
-            val msg = c.joinToString("%0A") { it.replace("%", "%25").replace("\r", "").replace("\n", "%0A") }
-            println("::error title=diag-$i::$msg")
+        val short = lines.map {
+            it.replace("file:///home/runner/work/Ai-file-explorer-/Ai-file-explorer-/app/src/main/java/com/nexarq/app/", "")
+              .replace("[compileDebugKotlin] e: ", "")
+        }
+        val chunks = short.take(900).chunked(22)
+        chunks.forEachIndexed { i, c ->
+            val msg = c.joinToString("%0A") { it.take(300).replace("%", "%25").replace("\r", "").replace("\n", "%0A") }
+            val level = when (i / 10) { 0 -> "error"; 1 -> "warning"; else -> "notice" }
+            println("::$level title=diag-$i::$msg")
         }
     }
 }
