@@ -133,26 +133,3 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 }
 
-// ---- TEMP CI DIAGNOSTICS: surface errors as GitHub annotations ----
-if (System.getenv("GITHUB_ACTIONS") == "true") {
-    val ciErrors = java.util.Collections.synchronizedList(mutableListOf<String>())
-    tasks.configureEach {
-        val t = this
-        t.logging.addStandardErrorListener { chunk ->
-            chunk.toString().lines().filter { it.isNotBlank() && !it.startsWith("::") }
-                .forEach { ciErrors.add("[${t.name}] $it") }
-        }
-    }
-    @Suppress("DEPRECATION")
-    gradle.buildFinished {
-        val lines = ciErrors.toMutableList()
-        var f: Throwable? = failure
-        while (f != null) { lines.add("FAILURE: ${f.javaClass.name}: ${f.message}"); f = f.cause }
-        if (lines.isNotEmpty()) {
-            lines.take(600).chunked(40).forEachIndexed { i, c ->
-                val msg = c.joinToString("%0A") { it.replace("%", "%25").replace("\r", "") }
-                println("::error title=diag-$i::$msg")
-            }
-        }
-    }
-}
